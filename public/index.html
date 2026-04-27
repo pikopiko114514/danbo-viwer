@@ -1,0 +1,173 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+    <meta charset="UTF-8">
+    <meta name="referrer" content="no-referrer">
+    <title>Booru AI Viewer</title>
+    <link rel="stylesheet" href="style.css">
+</head>
+<body>
+    <div class="header">
+        <h2>AI Illustration Viewer</h2>
+        <div class="search-box">
+            <input id="search" placeholder="タグを選択または入力...">
+            <button onclick="document.getElementById('search').value=''; newSearch();" style="background:#555;">クリア</button>
+            <input id="min_score" type="number" placeholder="スコア" style="width: 60px;" value="0">
+            <button onclick="newSearch()" style="background:#28a745;">この条件で検索</button>
+        </div>
+        <div class="controls" style="margin-top: 10px; display: flex; gap: 10px; justify-content: center; align-items: center;">
+            <select id="site-select" onchange="newSearch()" style="padding: 10px; border-radius: 5px; background: #333; color: white; border: none; cursor: pointer;">
+                <option value="rule34">Rule34</option>
+                <option value="gelbooru">Gelbooru</option>
+            </select>
+                <button onclick="window.open('/favorites', '_blank')" style="background: #ff4757; color: white; padding: 10px 20px; border-radius: 5px; border: none; cursor: pointer;">
+                    ❤️ 保存済み画像を見る
+                </button>
+        </div>
+        <div id="status"></div>
+    </div>
+
+    <div id="app"></div>
+    <div id="sentinel" style="height: 100px; clear: both; background: transparent;"></div>
+
+    <script>
+        let currentPage = 0;
+        let isLoading = false;
+        let hasMore = true;
+        let isSearchStarted = false;
+
+        // お気に入りリストをlocalStorageから読み込む
+        let likedPosts = JSON.parse(localStorage.getItem('likedPosts')) || [];
+
+        function newSearch() {
+            document.getElementById('app').innerHTML = '';
+            currentPage = 0;
+            hasMore = true;
+            isSearchStarted = true;
+            search();
+        }
+
+        async function search() {
+            if (isLoading || !hasMore) return;
+            isLoading = true;
+            document.getElementById('status').innerText = "読み込み中...";
+
+            const searchInput = document.getElementById('search');
+            const minScoreInput = document.getElementById('min_score');
+            const siteSelect = document.getElementById('site-select');
+            
+            const query = searchInput.value.trim();
+            const minScore = minScoreInput.value || 0;
+            const site = siteSelect ? siteSelect.value : 'rule34';
+
+            try {
+                const response = await fetch(`/api/search?q=${encodeURIComponent(query)}&p=${currentPage}&s=${minScore}&site=${site}`);
+                const data = await response.json();
+
+                if (!data || data.length === 0) {
+                    hasMore = false;
+                    if (currentPage === 0) {
+                        document.getElementById('app').innerHTML = '<p style="text-align:center; width:100%;">これ以上の作品はありません。</p>';
+                    }
+                } else {
+                    renderPosts(data);
+                    currentPage++;
+                    document.getElementById('status').innerText = "";
+                }
+            } catch (e) {
+                console.error("Search Error:", e);
+                document.getElementById('status').innerText = "エラーが発生しました。";
+            } finally {
+                isLoading = false;
+            }
+        }
+
+        function renderPosts(posts) {
+            const app = document.getElementById('app');
+            posts.forEach(post => {
+                const card = document.createElement('div');
+                card.className = 'card';
+                
+                const proxiedUrl = `/img?url=${encodeURIComponent(post.previewUrl || post.url)}`;
+                const postData = encodeURIComponent(JSON.stringify(post));
+                
+                card.innerHTML = `
+                    <div class="info-overlay">
+                        <span class="score">★ ${post.score}</span>
+                        <span class="date">${formatDate(post.createdAt)}</span>
+                    </div>
+                    <img src="${proxiedUrl}" alt="post" loading="lazy">
+                    
+                    <div class="btn-group">
+                        <button class="like-btn" onclick="toggleLike('${postData}')" title="お気に入り">❤️</button>
+                        <button class="like-btn" onclick="downloadImage('${post.url}', '${post.id}')" title="保存">💾</button>
+                    </div>
+
+                    <div class="tags-container">
+                        ${post.tags.split(' ').map(tag => `<span class="tag" onclick="jumpToTag('${tag}')">${tag}</span>`).join('')}
+                    </div>
+                `;
+                app.appendChild(card);
+            });
+        }
+
+        function toggleLike(postJson) {
+            const post = JSON.parse(decodeURIComponent(postJson));
+            
+            const currentSite = document.getElementById('site-select').value;
+            post.site = currentSite; 
+
+            const index = likedPosts.findIndex(p => p.id === post.id);
+            if (index === -1) {
+                likedPosts.unshift(post);
+                alert("お気に入りに追加しました！");
+            } else {
+                likedPosts.splice(index, 1);
+                alert("お気に入りから削除しました。");
+            }
+            localStorage.setItem('likedPosts', JSON.stringify(likedPosts));
+        }
+
+        function formatDate(dateStr) {
+            if (!dateStr) return "不明";
+            const date = new Date(dateStr);
+            return isNaN(date.getTime()) ? "不明" : date.toLocaleDateString('ja-JP');
+        }
+
+        function jumpToTag(tagName) {
+            const searchInput = document.getElementById('search');
+            const currentText = searchInput.value.trim();
+            const tags = currentText ? currentText.split(/\s+/) : [];
+            if (!tags.includes(tagName)) {
+                tags.push(tagName);
+                searchInput.value = tags.join(" ");
+                newSearch();
+            }
+        }
+
+        async function downloadImage(url, id) {
+            try {
+                const response = await fetch(`/img?url=${encodeURIComponent(url)}`);
+                const blob = await response.blob();
+                const blobUrl = window.URL.createObjectURL(blob);
+                const a = document.createElement('a');
+                a.href = blobUrl;
+                a.download = `booru_${id}.jpg`;
+                document.body.appendChild(a);
+                a.click();
+                document.body.removeChild(a);
+                window.URL.revokeObjectURL(blobUrl);
+            } catch (e) {
+                console.error("保存失敗:", e);
+            }
+        }
+
+        const observer = new IntersectionObserver(entries => {
+            if (entries[0].isIntersecting && isSearchStarted && !isLoading && hasMore) {
+                search();
+            }
+        }, { rootMargin: '200px' });
+        observer.observe(document.getElementById('sentinel'));
+    </script>
+</body>
+</html>

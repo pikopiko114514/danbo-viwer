@@ -1,0 +1,60 @@
+body {
+    margin: 0;
+    background: #121212; /* 画面全体を黒にする */
+    color: white;
+    font-family: sans-serif;
+}
+
+.header-bar {
+    padding: 20px;
+    text-align: center;
+    background: #1a1a1a;
+    border-bottom: 1px solid #333;
+}
+
+.back-link {
+    color: #aaa;
+    text-decoration: none;
+    font-size: 14px;
+}
+
+.back-link:hover {
+    color: #fff;
+}
+
+#app {
+    display: flex;         /* 縦並び */
+    flex-direction: column;
+    align-items: center;   /* 中央寄せ */
+    gap: 40px;             /* 画像同士の間隔 */
+    padding: 20px;
+    background: #121212;   /* ここも確実に黒に */
+}
+
+.card {
+    width: 100%;
+    max-width: 900px;      /* 大きすぎ防止 */
+    height: auto;
+    position: relative;
+    background: #1a1a1a;
+}
+
+.card img {
+    width: 100%;
+    height: auto;          /* 比率を維持 */
+    object-fit: contain;   /* 全体を表示 */
+    cursor: pointer;
+    box-shadow: 0 10px 30px rgba(0,0,0,0.7);
+}
+
+.btn-group {
+    position: absolute;
+    top: 15px;
+    right: 15px;
+    z-index: 100; /* 最前面に持ってくる */
+}
+
+.remove-btn:hover {
+    background: #ff0000 !important;
+    transform: scale(1.05);
+}

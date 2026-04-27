@@ -1,0 +1,77 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+    <meta charset="UTF-8">
+    <link rel="stylesheet" href="favorites.css">
+</head>
+<div class="header-bar">
+    <a href="/" class="back-link">← 検索に戻る</a>
+    <h1>❤️ My Favorites</h1>
+    
+    <div class="tab-menu">
+        <button class="tab-btn active" onclick="switchTab('all')">すべて</button>
+        <button class="tab-btn" onclick="switchTab('rule34')">Rule34</button>
+        <button class="tab-btn" onclick="switchTab('gelbooru')">Gelbooru</button>
+    </div>
+</div>
+
+<div id="app" class="gallery"></div>
+<script>
+    // localStorageから最新のデータを取得
+    let likedPosts = JSON.parse(localStorage.getItem('likedPosts')) || [];
+
+    function renderFavorites() {
+        const app = document.getElementById('app');
+        app.innerHTML = '';
+
+        if (likedPosts.length === 0) {
+            app.innerHTML = '<p style="text-align:center; margin-top:50px; color:#666;">お気に入りはまだありません。</p>';
+            return;
+        }
+
+        likedPosts.forEach((post) => {
+            const card = document.createElement('div');
+            card.className = 'card';
+            
+            const fullUrl = `/img?url=${encodeURIComponent(post.url)}`;
+            
+            card.innerHTML = `
+                <div class="btn-group" style="position: absolute; top: 10px; right: 10px; z-index: 50;">
+                    <button class="remove-btn" onclick="removeFavorite('${post.id}')" 
+                        style="background: rgba(255,0,0,0.8); color:white; border:none; padding:8px 12px; border-radius:5px; cursor:pointer; font-weight:bold;">
+                        ❌ 削除
+                    </button>
+                </div>
+                
+                <a href="${fullUrl}" target="_blank">
+                    <img src="${fullUrl}" alt="post" loading="lazy">
+                </a>
+            `;
+            app.appendChild(card);
+        });
+    }
+
+    // IDで検索して削除する関数
+    function removeFavorite(postId) {
+        if (!confirm('この画像をお気に入りから削除しますか？')) return;
+
+        // 1. 削除実行の直前に、localStorageから最新のデータを読み直す（重要！）
+        let currentPosts = JSON.parse(localStorage.getItem('likedPosts')) || [];
+
+        // 2. IDが一致しないものだけを残す（＝特定の画像を削除）
+        // ※IDが数値でも文字列でも比較できるように String() を使います
+        const updatedPosts = currentPosts.filter(post => String(post.id) !== String(postId));
+
+        // 3. ブラウザの保存領域を新しいリストで完全に上書きする
+        localStorage.setItem('likedPosts', JSON.stringify(updatedPosts));
+
+        // 4. メモリ上の変数も更新して、画面を再描画する
+        likedPosts = updatedPosts;
+        renderFavorites();
+        
+        console.log("削除完了。現在の保存数:", updatedPosts.length);
+    }
+
+    // 初回実行
+    renderFavorites();
+</script>

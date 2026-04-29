@@ -3,7 +3,16 @@
 <head>
     <meta charset="UTF-8">
     <link rel="stylesheet" href="favorites.css">
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/jszip/3.10.1/jszip.min.js"></script>
 </head>
+<div class="bulk-actions" style="margin-top: 20px; display: flex; gap: 10px; justify-content: center;">
+    <button onclick="downloadAllAsZip()" style="background: #28a745; color: white; padding: 10px 20px; border-radius: 5px; border: none; cursor: pointer;">
+        📦 お気に入りを一括ダウンロード (ZIP)
+    </button>
+    <button onclick="clearAllFavorites()" style="background: #dc3545; color: white; padding: 10px 20px; border-radius: 5px; border: none; cursor: pointer;">
+        🗑️ お気に入りをすべて削除
+    </button>
+</div>
 <div class="header-bar">
     <a href="/" class="back-link">← 検索に戻る</a>
     <h1>❤️ My Favorites</h1>
@@ -70,6 +79,62 @@
         renderFavorites();
         
         console.log("削除完了。現在の保存数:", updatedPosts.length);
+    }
+    function clearAllFavorites() {
+        if (!confirm('すべてのお気に入りを削除してもよろしいですか？この操作は取り消せません。')) return;
+        
+        localStorage.removeItem('likedPosts');
+        likedPosts = [];
+        renderFavorites();
+        alert('すべて削除しました。');
+        }
+        async function downloadAllAsZip() {
+        if (likedPosts.length === 0) {
+            alert('ダウンロードする画像がありません。');
+            return;
+        }
+
+        const btn = event.target;
+        const originalText = btn.innerText;
+        btn.innerText = "⏳ 準備中...";
+        btn.disabled = true;
+
+        const zip = new JSZip();
+        const folder = zip.folder("my_favorites");
+
+        try {
+            const promises = likedPosts.map(async (post, index) => {
+                // プロキシ経由で画像を取得
+                const response = await fetch(`/img?url=${encodeURIComponent(post.url)}`);
+                if (!response.ok) throw new Error(`Failed to fetch ${post.id}`);
+                const blob = await response.blob();
+                
+                // ファイル名を作成（重複防止のためIDやIndexを付与）
+                const fileName = `${post.site}_${post.id}.jpg`;
+                folder.file(fileName, blob);
+            });
+
+            await Promise.all(promises);
+
+            // ZIPファイルを生成してダウンロード
+            const content = await zip.generateAsync({ type: "blob" });
+            const zipUrl = window.URL.createObjectURL(content);
+            const a = document.createElement('a');
+            a.href = zipUrl;
+            a.download = `danbo_favorites_${new Date().getTime()}.zip`;
+            document.body.appendChild(a);
+            a.click();
+            document.body.removeChild(a);
+            window.URL.revokeObjectURL(zipUrl);
+
+            alert('ダウンロードが完了しました！');
+        } catch (e) {
+            console.error("一括ダウンロード失敗:", e);
+            alert('一部の画像の取得に失敗しました。');
+        } finally {
+            btn.innerText = originalText;
+            btn.disabled = false;
+        }
     }
 
     // 初回実行

@@ -4,6 +4,11 @@ import path from 'path';
 import { fileURLToPath } from 'url';
 import apiRouter from "./routes/api.js"; 
 import proxyRouter from "./routes/proxy.js";
+import pixivRouter from "./routes/pixiv.js";
+import dotenv from "dotenv";
+dotenv.config();
+// 確認用：起動時にCookieが読み込めているかログを出す（本番時は消してください）
+console.log("Cookie status:", process.env.PIXIV_COOKIE ? "Loaded" : "Not Found");
 
 // ES Modulesで __dirname を再現する設定
 const __filename = fileURLToPath(import.meta.url);
@@ -16,8 +21,10 @@ const PORT = process.env.PORT || 3000;
 app.use(express.static(path.join(__dirname, 'public')));
 
 // APIとプロキシのルートを設定
-app.use("/api", apiRouter);
+app.use("/api", apiRouter);        // Rule34, Gelbooruなど
+app.use("/api/pixiv", pixivRouter); // ★Pixiv専用（/api/pixiv/search になる）
 app.use("/img", proxyRouter);
+
 
 // 「お気に入り画面」のルート
 app.get('/favorites', (req, res) => {

@@ -5,7 +5,8 @@
     <link rel="stylesheet" href="favorites.css">
     <script src="https://cdnjs.cloudflare.com/ajax/libs/jszip/3.10.1/jszip.min.js"></script>
 </head>
-<div class="header-bar">
+<body>
+    <div class="header-bar">
     <a href="/" class="back-link">← 検索に戻る</a>
     <h1>❤️ My Favorites</h1>
     
@@ -15,11 +16,11 @@
         <button class="tab-btn" onclick="switchTab('gelbooru')">Gelbooru</button>
     </div>
 
-    <div class="bulk-controls" style="margin-top: 15px; display: flex; gap: 10px; justify-content: center;">
-        <button onclick="downloadAllAsZip()" id="zip-btn" style="background: #28a745; color: white; padding: 8px 15px; border-radius: 5px; border: none; cursor: pointer; font-size: 14px;">
+    <div class="bulk-controls">
+        <button onclick="downloadAllAsZip()" id="zip-btn">
             📦 ZIPで一括保存
         </button>
-        <button onclick="clearAllFavorites()" style="background: #555; color: white; padding: 8px 15px; border-radius: 5px; border: none; cursor: pointer; font-size: 14px;">
+        <button onclick="clearAllFavorites()" id="clear-all-btn">
             🗑️ すべて削除
         </button>
     </div>
@@ -35,7 +36,7 @@
         app.innerHTML = '';
 
         if (likedPosts.length === 0) {
-            app.innerHTML = '<p style="text-align:center; margin-top:50px; color:#666;">お気に入りはまだありません。</p>';
+            app.innerHTML = '<p class="no-favorites-message">お気に入りはまだありません。</p>';
             return;
         }
 
@@ -47,8 +48,7 @@
             
             card.innerHTML = `
                 <div class="btn-group" style="position: absolute; top: 10px; right: 10px; z-index: 50;">
-                    <button class="remove-btn" onclick="removeFavorite('${post.id}')" 
-                        style="background: rgba(255,0,0,0.8); color:white; border:none; padding:8px 12px; border-radius:5px; cursor:pointer; font-weight:bold;">
+                    <button class="remove-btn" onclick="removeFavorite('${post.id}')">
                         ❌ 削除
                     </button>
                 </div>
@@ -141,3 +141,4 @@
         }
     }
 </script>
+</body>

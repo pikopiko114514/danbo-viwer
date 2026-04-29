@@ -4,24 +4,23 @@
     <meta charset="UTF-8">
     <meta name="referrer" content="no-referrer">
     <title>Booru AI Viewer</title>
-    <link rel="stylesheet" href="style.css">
-    <button onclick="location.href='/pixiv'" style="background: #0096fa; color: white;">Pixiv版を開く</button>
+    <link rel="stylesheet" href="style.css"> 
 </head>
 <body>
     <div class="header">
         <h2>AI Illustration Viewer</h2>
         <div class="search-box">
             <input id="search" placeholder="タグを選択または入力...">
-            <button onclick="document.getElementById('search').value=''; newSearch();" style="background:#555;">クリア</button>
-            <input id="min_score" type="number" placeholder="スコア" style="width: 60px;" value="0">
-            <button onclick="newSearch()" style="background:#28a745;">この条件で検索</button>
+            <button id="clear-search-btn" class="secondary-btn">クリア</button>
+            <input id="min_score" type="number" placeholder="スコア" value="0">
+            <button id="search-btn" class="primary-btn">この条件で検索</button>
         </div>
-        <div class="controls" style="margin-top: 10px; display: flex; gap: 10px; justify-content: center; align-items: center;">
-            <select id="site-select" onchange="newSearch()" style="padding: 10px; border-radius: 5px; background: #333; color: white; border: none; cursor: pointer;">
+        <div class="controls">
+            <select id="site-select">
                 <option value="rule34">Rule34</option>
                 <option value="gelbooru">Gelbooru</option>
             </select>
-                <button onclick="window.open('/favorites', '_blank')" style="background: #ff4757; color: white; padding: 10px 20px; border-radius: 5px; border: none; cursor: pointer;">
+                <button id="view-favorites-btn" class="favorite-btn">
                     ❤️ 保存済み画像を見る
                 </button>
         </div>
@@ -88,33 +87,31 @@
                 const card = document.createElement('div');
                 card.className = 'card';
                 
-                const proxiedUrl = `/img?url=${encodeURIComponent(post.previewUrl || post.url)}`;
+                const proxiedUrl = `/img?url=${encodeURIComponent(post.previewUrl || post.file_url || post.url)}`; // Added file_url for robustness
                 const postData = encodeURIComponent(JSON.stringify(post));
                 const isLiked = likedPosts.some(p => String(p.id) === String(post.id));
                 const rawDate = post.createdAt || post.created_at;
 
                 card.innerHTML = `
                     <div class="media-container">
-                        <div style="position: absolute; top: 0; left: 0; padding: 5px 10px; background: rgba(0,0,0,0.6); color: white; font-size: 10px; z-index: 10; pointer-events: none;">
+                        <div class="date-badge">
                             ${formatDate(rawDate)}
                         </div>
 
-                        <div style="position: absolute; top: 8px; right: 8px; display: flex; gap: 6px; z-index: 20;">
-                            <button id="like-btn-${post.id}" onclick="event.stopPropagation(); toggleLike('${postData}')" 
-                                style="background: rgba(0,0,0,0.7); border: 1px solid rgba(255,255,255,0.3); color: white; width: 36px; height: 36px; border-radius: 50%; cursor: pointer; font-size: 18px; display: flex; align-items: center; justify-content: center;">
+                        <div class="card-buttons">
+                            <button id="like-btn-${post.id}" class="like-btn ${isLiked ? 'liked' : ''}" data-post-data="${postData}">
                                 ${isLiked ? '❤️' : '🤍'}
                             </button>
-                            <button onclick="event.stopPropagation(); downloadImage('${post.url}', '${post.id}')" 
-                                style="background: rgba(0,0,0,0.7); border: 1px solid rgba(255,255,255,0.3); color: white; width: 36px; height: 36px; border-radius: 50%; cursor: pointer; font-size: 16px; display: flex; align-items: center; justify-content: center;">
+                            <button class="download-btn" data-post-url="${post.url}" data-post-id="${post.id}">
                                 💾
                             </button>
                         </div>
 
-                        <a href="${post.url}" target="_blank" style="display: block; width: 100%; height: 100%;">
+                        <a href="${post.url}" target="_blank">
                             <img src="${proxiedUrl}" alt="post" loading="lazy">
                         </a>
 
-                        <div style="position: absolute; bottom: 5px; left: 5px; background: rgba(0,0,0,0.5); color: #ffcc00; padding: 2px 6px; border-radius: 4px; font-size: 11px; pointer-events: none;">
+                        <div class="score-badge">
                             ★ ${post.score}
                         </div>
                     </div>
@@ -135,9 +132,7 @@
                 likedPosts.push(post);
                 if (btn) {
                     btn.innerText = '❤️';
-                    btn.classList.add('liked');
-                    btn.style.transform = "scale(1.3)"; // 少し大きくする演出
-                    setTimeout(() => btn.style.transform = "scale(1)", 200);
+                    btn.classList.add('liked'); // CSSでアニメーションを制御
                 }
             } else {
                 likedPosts.splice(index, 1);
@@ -189,7 +184,45 @@
                 search();
             }
         }, { rootMargin: '200px' });
-        observer.observe(document.getElementById('sentinel'));
+
+        document.addEventListener('DOMContentLoaded', () => {
+            // Initial search if no search has been started yet (e.g., first load)
+            if (!isSearchStarted) {
+                newSearch();
+            }
+
+            // Event Listeners for buttons and select
+            document.getElementById('clear-search-btn').addEventListener('click', () => {
+                document.getElementById('search').value = '';
+                newSearch();
+            });
+            document.getElementById('search-btn').addEventListener('click', newSearch);
+            document.getElementById('site-select').addEventListener('change', newSearch);
+            document.getElementById('view-favorites-btn').addEventListener('click', () => {
+                window.open('/favorites', '_blank');
+            });
+            document.getElementById('app').addEventListener('click', (event) => {
+                if (event.target.classList.contains('like-btn')) {
+                    event.stopPropagation();
+                    toggleLike(event.target.dataset.postData);
+                } else if (event.target.classList.contains('download-btn')) {
+                    event.stopPropagation();
+                    downloadImage(event.target.dataset.postUrl, event.target.dataset.postId);
+                } else if (event.target.classList.contains('tag')) {
+                    jumpToTag(event.target.textContent);
+                }
+            });
+            // Add a button for Pixiv link, as it was removed from the top
+            const pixivLinkBtn = document.createElement('button');
+            pixivLinkBtn.textContent = 'Pixiv版を開く';
+            pixivLinkBtn.classList.add('pixiv-btn');
+            pixivLinkBtn.addEventListener('click', () => {
+                location.href='/pixiv';
+            });
+            document.querySelector('.header').insertBefore(pixivLinkBtn, document.querySelector('.search-box'));
+
+            observer.observe(document.getElementById('sentinel'));
+        });
     </script>
 </body>
 </html>

@@ -23,7 +23,7 @@ router.get("/search", async (req, res) => {
             httpOnly: true
         });
     }
-    
+
     const encodedKeyword = encodeURIComponent(keyword);
     const targetUrl = `https://www.pixiv.net/tags/${encodedKeyword}/artworks?mode=r18&s_mode=s_tag_full&p=${pageNumber}`;
     
@@ -55,8 +55,9 @@ router.get("/search", async (req, res) => {
         });
     });
 
-    // データの抽出
+    // データの抽出 (スコア取得を削除した安定版)
     const results = await page.evaluate(() => {
+        // aタグを基準に取得します
         const links = Array.from(document.querySelectorAll('a[href*="/artworks/"]'));
         const seen = new Set();
         const items = [];
@@ -70,16 +71,29 @@ router.get("/search", async (req, res) => {
             if (seen.has(id)) continue;
             seen.add(id);
 
+            // aタグの親要素を card として定義（ここでエラーが起きていました）
+            const card = link.parentElement; 
             const img = link.querySelector("img");
-            // LazyLoad対策: srcがなければ data-src を見る
             let rawUrl = img?.src || img?.getAttribute("src") || img?.getAttribute("data-src") || "";
 
             if (!rawUrl || rawUrl.includes('common/images/limit_')) continue;
 
-            // 絶対パス化
+            // --- 枚数（ページ数）の抽出 ---
+            // Pixivの現在の構造に合わせ、カード内の特定の要素から数字を探します
+            let pageCount = 1;
+            // 画像の上に重なっている枚数表示用のspanや、数字のみの要素を検索
+            const countElements = Array.from(card.querySelectorAll('span, div'));
+                for (const el of countElements) {
+                    const txt = el.innerText.trim();
+                    // 非常に小さい範囲にある1〜3桁の純粋な数字を探す
+                    if (/^\d{1,3}$/.test(txt) && el.offsetWidth < 40) {
+                        pageCount = parseInt(txt);
+                        break;
+                    }
+            }
+
             if (rawUrl.startsWith('/')) rawUrl = "https://www.pixiv.net" + rawUrl;
 
-            // ★ここで確実に定義する: displayUrl の置換ロジック
             const displayUrl = rawUrl
                 .replace(/\/c\/\d+x\d+[^/]*\//, '/')
                 .replace(/\/(custom-thumb|img-obfuscated)\//, '/img-master/')
@@ -87,9 +101,10 @@ router.get("/search", async (req, res) => {
 
             items.push({
                 id,
-                url: displayUrl, // 定義済みの変数を使用
+                url: displayUrl,
                 tags: img?.alt || "",
                 score: 0,
+                pageCount: pageCount,
                 isPixiv: true
             });
         }

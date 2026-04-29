@@ -84,17 +84,9 @@
             }
         }
         function searchByAuthor(userId, userName) {
-            document.getElementById('app').innerHTML = ''; // 画面クリア
-            currentPage = 1;
-            hasMore = true;
-            isSearchStarted = true;
-            
-            currentUserId = userId; // 作者モードON
-            
-            const status = document.getElementById('status');
-            status.innerHTML = `作者: <strong>${userName}</strong> の作品を表示中 <button id="reset-keyword-search-btn" class="small-btn">キーワード検索に戻る</button>`;
-            
-            search();
+            // 作者検索を別タブで開く
+            const url = `/pixiv?userId=${userId}&userName=${encodeURIComponent(userName)}`;
+            window.open(url, '_blank');
         }
 
         // キーワード検索に戻す
@@ -165,8 +157,20 @@
         }, { rootMargin: '400px' }); // 早めに読み込むよう余裕を持たせる
 
         document.addEventListener('DOMContentLoaded', () => {
-            // Initial search if no search has been started yet (e.g., first load)
-            if (!isSearchStarted) {
+            // URLパラメータから作者IDがあるか確認
+            const urlParams = new URLSearchParams(window.location.search);
+            const userIdParam = urlParams.get('userId');
+            const userNameParam = urlParams.get('userName');
+
+            if (userIdParam) {
+                // 作者検索モードで初期化
+                currentUserId = userIdParam;
+                isSearchStarted = true;
+                const status = document.getElementById('status');
+                status.innerHTML = `作者: <strong>${userNameParam || '不明'}</strong> の作品を表示中 <button id="reset-keyword-search-btn" class="small-btn">キーワード検索に戻る</button>`;
+                search();
+            } else if (!isSearchStarted) {
+                // 通常の初期検索
                 newSearch();
             }
 

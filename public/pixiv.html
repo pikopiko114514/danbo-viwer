@@ -1,0 +1,208 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+    <meta charset="UTF-8">
+    <meta name="referrer" content="no-referrer">
+    <title>Pixiv AI Viewer (R18)</title>
+    <link rel="stylesheet" href="style.css">
+</head>
+<body>
+    <div class="header">
+        <h2>Pixiv Illustration Viewer</h2>
+            <div class="search-box">
+                <input id="search" placeholder="タグを入力..." value="AI生成">
+                <button id="clear-search-btn" class="secondary-btn">クリア</button>
+                <button id="pixiv-search-btn" class="pixiv-btn">Pixiv検索</button>
+            </div>
+        <div class="controls">
+            <button id="back-to-booru-btn" class="secondary-btn">
+                🏠 Booru版へ戻る
+            </button>
+        </div>
+        <div id="status"></div>
+    </div>
+
+    <div id="app"></div>
+    <div id="sentinel" style="height: 100px; clear: both; background: transparent;"></div>
+
+    <script>
+        let currentPage = 1; // Pixivは1ページ目から開始
+        let isLoading = false;
+        let hasMore = true;
+        let isSearchStarted = false;
+        let currentUserId = null; // 現在の作者検索モードを保持
+
+        // 検索リセット
+        function newSearch() {
+            currentUserId = null; // キーワード検索時はリセット
+            document.getElementById('app').innerHTML = '';
+            currentPage = 1;
+            hasMore = true;
+            isSearchStarted = true;
+            search();
+        }
+        async function search() {
+            if (isLoading || !hasMore) return;
+            isLoading = true;
+
+            const query = document.getElementById('search').value;
+            const status = document.getElementById('status');
+
+            status.innerText = `読み込み中... (${currentPage}ページ目)`;
+
+            try {
+                // userIdがある場合はそちらを優先、ない場合はキーワード検索
+                let url = `/api/pixiv/search?p=${currentPage}`;
+                if (currentUserId) {
+                    url += `&userId=${currentUserId}`;
+                } else {
+                    url += `&q=${encodeURIComponent(query)}`;
+                }
+                                
+                const response = await fetch(url);
+                const data = await response.json();
+
+                if (!response.ok) {
+                    throw new Error(data.error || "Request failed");
+                }
+
+                if (!data || data.length === 0) {
+                    hasMore = false;
+                    status.innerText = "これ以上の投稿はありません。";
+                } else {
+                    // スコアフィルタを削除し、全データを描画
+                    renderPixivPosts(data); 
+                    
+                    currentPage++;
+                    status.innerText = "";
+                }
+            } catch (e) {
+                console.error("Pixiv Search failed", e);
+                status.innerText = e.message;
+            } finally {
+                isLoading = false;
+            }
+        }
+        function searchByAuthor(userId, userName) {
+            // 作者検索を別タブで開く
+            const url = `/pixiv?userId=${userId}&userName=${encodeURIComponent(userName)}`;
+            window.open(url, '_blank');
+        }
+
+        // キーワード検索に戻す
+        function resetToKeywordSearch() {
+            currentUserId = null;
+            newSearch();
+        }
+        function renderPixivPosts(posts) {
+            const app = document.getElementById('app');
+            posts.forEach(post => {
+                if (!post.url) return;
+                const card = document.createElement('div');
+                card.className = 'card';
+                const proxiedUrl = `/img?url=${encodeURIComponent(post.url)}`;
+
+                // 日付バッジ
+                const dateBadge = post.date ? `<div class="date-badge">${post.date}</div>` : '';
+                // 枚数バッジ
+                const pageBadge = post.pageCount > 1 ? `<div class="page-badge">📄 ${post.pageCount}</div>` : '';
+                // 作者
+                const authorContent = post.userName 
+                ? `by <span class="author-link" data-user-id="${post.userId}" data-user-name="${post.userName}">${post.userName}</span>` 
+                : ''; // Content for author-info div
+                
+                card.innerHTML = `
+                    <div class="media-container">
+                        <a href="https://www.pixiv.net/artworks/${post.id}" target="_blank">
+                            <img src="${proxiedUrl}" alt="post" loading="lazy">
+                        </a>
+                        ${dateBadge}
+                        ${pageBadge}
+                        <div class="button-group">
+                            <button class="bookmark-btn" data-illust-id="${post.id}">❤</button>
+                        </div>
+                    </div>
+                    <div class="author-info">
+                        ${authorContent}
+                    </div>
+                    <div class="tags-container">
+                        ${post.tags ? post.tags.split(' ').map(tag => `<span class="tag">${tag}</span>`).join('') : ''}
+                    </div>
+                `;
+                app.appendChild(card);
+            });
+        }
+        
+        // 2. ポップアップ方式のブックマーク関数（確実な方法）
+        function addBookmark(id, btnElement) {
+            const url = `https://www.pixiv.net/bookmark_add.php?type=illust&illust_id=${id}`;
+            const width = 500;
+            const height = 600;
+            const left = (window.screen.width / 2) - (width / 2);
+            const top = (window.screen.height / 2) - (height / 2);
+            
+            window.open(url, 'pixiv_bookmark', `width=${width},height=${height},top=${top},left=${left},scrollbars=yes`);
+            
+            // 押し間違い防止のために色を変える
+            if (btnElement) {
+                btnElement.style.background = "#ff4081";
+            }
+        }
+
+        // スクロール検知（無限スクロール実装）
+        const observer = new IntersectionObserver(entries => {
+            if (entries[0].isIntersecting && isSearchStarted && !isLoading && hasMore) {
+                search();
+            }
+        }, { rootMargin: '400px' }); // 早めに読み込むよう余裕を持たせる
+
+        document.addEventListener('DOMContentLoaded', () => {
+            // URLパラメータから作者IDがあるか確認
+            const urlParams = new URLSearchParams(window.location.search);
+            const userIdParam = urlParams.get('userId');
+            const userNameParam = urlParams.get('userName');
+
+            if (userIdParam) {
+                // 作者検索モードで初期化
+                currentUserId = userIdParam;
+                isSearchStarted = true;
+                const status = document.getElementById('status');
+                status.innerHTML = `作者: <strong>${userNameParam || '不明'}</strong> の作品を表示中 <button id="reset-keyword-search-btn" class="small-btn">キーワード検索に戻る</button>`;
+                search();
+            } else if (!isSearchStarted) {
+                // 通常の初期検索
+                newSearch();
+            }
+
+            // Event Listeners for buttons
+            document.getElementById('clear-search-btn').addEventListener('click', () => {
+                document.getElementById('search').value = '';
+                newSearch();
+            });
+            document.getElementById('pixiv-search-btn').addEventListener('click', newSearch);
+            document.getElementById('back-to-booru-btn').addEventListener('click', () => {
+                location.href = '/';
+            });
+
+            // Event delegation for dynamically added author links and bookmark buttons
+            document.getElementById('app').addEventListener('click', (event) => {
+                if (event.target.classList.contains('author-link')) {
+                    event.stopPropagation();
+                    searchByAuthor(event.target.dataset.userId, event.target.dataset.userName);
+                } else if (event.target.classList.contains('bookmark-btn')) {
+                    event.stopPropagation();
+                    addBookmark(event.target.dataset.illustId, event.target);
+                }
+            });
+            document.getElementById('status').addEventListener('click', (event) => {
+                if (event.target.id === 'reset-keyword-search-btn') {
+                    resetToKeywordSearch();
+                }
+            });
+
+            observer.observe(document.getElementById('sentinel'));
+        });
+    </script>
+
+</body>
+</html>

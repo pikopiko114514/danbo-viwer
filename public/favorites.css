@@ -1,57 +1,133 @@
 body {
+    font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
     margin: 0;
-    background: #121212; /* 画面全体を黒にする */
-    color: white;
-    font-family: sans-serif;
+    background-color: #222;
+    color: #eee;
 }
 
 .header-bar {
-    padding: 20px;
-    text-align: center;
-    background: #1a1a1a;
-    border-bottom: 1px solid #333;
+    background-color: #333;
+    padding: 15px 20px;
+    border-bottom: 1px solid #444;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 10px;
+}
+
+.header-bar h1 {
+    margin: 0;
+    color: #ff4757;
+    font-size: 2em;
 }
 
 .back-link {
-    color: #aaa;
+    color: #007bff;
     text-decoration: none;
-    font-size: 14px;
+    font-size: 1.1em;
+    align-self: flex-start;
 }
 
 .back-link:hover {
-    color: #fff;
+    text-decoration: underline;
+}
+
+.tab-menu {
+    display: flex;
+    gap: 10px;
+    margin-top: 10px;
+}
+
+.tab-btn {
+    background: #555;
+    color: white;
+    padding: 8px 15px;
+    border-radius: 5px;
+    border: none;
+    cursor: pointer;
+    font-size: 14px;
+    transition: background 0.3s ease;
+}
+
+.tab-btn:hover {
+    background: #777;
+}
+
+.tab-btn.active {
+    background: #007bff;
+    font-weight: bold;
+}
+
+.bulk-controls {
+    margin-top: 15px;
+    display: flex;
+    gap: 10px;
+    justify-content: center;
+}
+
+.bulk-controls button {
+    padding: 8px 15px;
+    border-radius: 5px;
+    border: none;
+    cursor: pointer;
+    font-size: 14px;
+    color: white;
+}
+
+#zip-btn { background: #28a745; }
+#clear-all-btn { background: #555; }
+
+.no-favorites-message {
+    text-align:center;
+    margin-top:50px;
+    color:#666;
+    font-size: 1.2em;
 }
 
 #app {
-    display: flex;         /* 縦並び */
+    display: flex;
     flex-direction: column;
-    align-items: center;   /* 中央寄せ */
-    gap: 40px;             /* 画像同士の間隔 */
+    align-items: center;
+    gap: 40px;
     padding: 20px;
-    background: #121212;   /* ここも確実に黒に */
+    max-width: 100%;
+    margin: 20px auto;
 }
 
 .card {
-    width: 100%;
-    max-width: 900px;      /* 大きすぎ防止 */
-    height: auto;
+    background-color: transparent;
+    border-radius: 8px;
     position: relative;
-    background: #1a1a1a;
+    width: 100%;
+    max-width: 1000px; /* 画面に収まりやすくするための最大幅 */
 }
 
 .card img {
     width: 100%;
-    height: auto;          /* 比率を維持 */
-    object-fit: contain;   /* 全体を表示 */
+    height: auto;
+    object-fit: contain;
     cursor: pointer;
-    box-shadow: 0 10px 30px rgba(0,0,0,0.7);
+    display: block;
+    border-radius: 8px;
+    box-shadow: 0 10px 30px rgba(0,0,0,0.5);
 }
 
 .btn-group {
     position: absolute;
-    top: 15px;
-    right: 15px;
-    z-index: 100; /* 最前面に持ってくる */
+    top: 10px;
+    right: 10px;
+    z-index: 50;
+}
+
+.remove-btn {
+    background: rgba(255,0,0,0.8);
+    color:white;
+    border:none;
+    padding:8px 12px;
+    border-radius:5px;
+    cursor:pointer;
+    font-weight:bold;
+    transition: background 0.2s ease;
 }
 
 .remove-btn:hover {

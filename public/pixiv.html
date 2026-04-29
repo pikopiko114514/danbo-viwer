@@ -70,8 +70,6 @@
                 isLoading = false;
             }
         }
-
-        // 描画関数からもスコアバッジを削除
         function renderPixivPosts(posts) {
             const app = document.getElementById('app');
             posts.forEach(post => {
@@ -80,19 +78,23 @@
                 card.className = 'card';
                 const proxiedUrl = `/img?url=${encodeURIComponent(post.url)}`;
 
-                // 枚数が2枚以上の時だけラベルを表示する
+                // 日付バッジ
+                const dateBadge = post.date ? `<div class="date-badge">${post.date}</div>` : '';
+                // 枚数バッジ
                 const pageBadge = post.pageCount > 1 ? `<div class="page-badge">📄 ${post.pageCount}</div>` : '';
 
                 card.innerHTML = `
                     <div class="media-container" style="position: relative;">
-                        <a href="https://www.pixiv.net/artworks/${post.id}" target="_blank" style="display: block; width: 100%; height: 100%;">
+                        <a href="https://www.pixiv.net/artworks/${post.id}" target="_blank" style="display: block;">
                             <div style="width: 100%; height: 250px; background: #222;">
-                                <img src="${proxiedUrl}" 
-                                    style="width: 100%; height: 100%; object-fit: cover;" 
-                                    loading="lazy">
+                                <img src="${proxiedUrl}" style="width: 100%; height: 100%; object-fit: cover;" loading="lazy">
                             </div>
                         </a>
+                        ${dateBadge}
                         ${pageBadge}
+                        <div class="button-group">
+                            <button class="bookmark-btn" onclick="addBookmark('${post.id}', this)">❤</button>
+                        </div>
                     </div>
                     <div class="tags-container">
                         ${post.tags ? post.tags.split(' ').map(tag => `<span class="tag">${tag}</span>`).join('') : ''}
@@ -101,26 +103,76 @@
                 app.appendChild(card);
             });
         }
-        
 
-        // スタイル（CSS）にバッジの見た目を追加
+        // ポップアップ方式のブックマーク
+        function addBookmark(id, btnElement) {
+            const url = `https://www.pixiv.net/bookmark_add.php?type=illust&illust_id=${id}`;
+            window.open(url, 'pixiv_bookmark', 'width=500,height=600,top=100,left=100');
+            btnElement.style.background = "#ff4081";
+        }
+
+        // 2. ポップアップ方式のブックマーク関数（確実な方法）
+        function addBookmark(id, btnElement) {
+            const url = `https://www.pixiv.net/bookmark_add.php?type=illust&illust_id=${id}`;
+            const width = 500;
+            const height = 600;
+            const left = (window.screen.width / 2) - (width / 2);
+            const top = (window.screen.height / 2) - (height / 2);
+            
+            window.open(url, 'pixiv_bookmark', `width=${width},height=${height},top=${top},left=${left},scrollbars=yes`);
+            
+            // 押し間違い防止のために色を変える
+            btnElement.style.background = "#ff4081";
+        }
+
+        // 3. スタイルの修正（日付バッジを追加）
         const style = document.createElement('style');
         style.textContent = `
-            .page-badge {
+            .page-badge, .date-badge {
                 position: absolute;
-                top: 10px;
-                right: 10px;
                 background: rgba(0, 0, 0, 0.75);
                 color: white;
                 padding: 3px 8px;
                 border-radius: 6px;
-                font-size: 13px;
+                font-size: 12px;
                 font-weight: bold;
-                 z-index: 5; /* 追加 */
+                z-index: 5;
                 pointer-events: none;
-                display: flex;
-                align-items: center;
-                gap: 4px;
+            }
+
+            .page-badge { top: 10px; right: 10px; }
+            .date-badge { top: 10px; left: 10px; font-family: monospace; }
+
+            .button-group {
+                position: absolute;
+                bottom: 8px;
+                right: 8px;
+                z-index: 10;
+            }
+
+            .bookmark-btn {
+                border: none;
+                border-radius: 4px;
+                padding: 6px 14px;
+                background: rgba(0, 0, 0, 0.7);
+                color: white;
+                font-size: 18px;
+                cursor: pointer;
+                transition: background 0.2s;
+            }
+            .bookmark-btn:hover { background: #ff4081; }
+            
+            .date-badge {
+            position: absolute;
+            top: 10px;
+            left: 10px;
+            background: rgba(0, 0, 0, 0.7);
+            color: white;
+            padding: 2px 6px;
+            border-radius: 4px;
+            font-size: 11px;
+            font-family: monospace;
+            z-index: 5;
             }
         `;
         document.head.appendChild(style);

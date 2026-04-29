@@ -29,35 +29,37 @@ router.get("/search", async (req, res) => {
     
     console.log(`Fetching: ${targetUrl}`);
 
-    // 修正箇所: タイムアウトを60秒に延長し、waitUntil を変更
+    // 1. ページ移動
     await page.goto(targetUrl, { 
-        waitUntil: "domcontentloaded", // "networkidle2" より早く完了判定されます
-        timeout: 60000                 // 60秒まで待機するように延長
+        waitUntil: "networkidle2", 
+        timeout: 60000 
     });
 
-    // 追加: domcontentloaded の後に少し待機を入れるとより安定します
-    await new Promise(r => setTimeout(r, 2000));
+    await page.waitForSelector('a[href*="/artworks/"]', { timeout: 15000 });
 
-    // 画像をロードさせるための自動スクロール
     await page.evaluate(async () => {
         await new Promise((resolve) => {
             let totalHeight = 0;
-            const distance = 400;
+            const distance = 1000; // 1回のスクロール量
+            const maxScroll = 8000; // Pixivの1ページ分をカバーする十分な深さ
             const timer = setInterval(() => {
-                const scrollHeight = document.body.scrollHeight;
                 window.scrollBy(0, distance);
                 totalHeight += distance;
-                if (totalHeight >= scrollHeight || totalHeight > 3000) {
+
+                // 十分な深さまでスクロールしたら終了
+                if (totalHeight >= maxScroll) {
                     clearInterval(timer);
                     resolve();
                 }
-            }, 100);
+            }, 200); // 0.2秒おきにスクロール
         });
     });
 
-    // データの抽出 (スコア取得を削除した安定版)
+    // 3. スクロール後、画像要素が整うまで1秒だけ待機
+    await new Promise(r => setTimeout(r, 1000));
+
+    // 3. データの抽出（うまく動いていたロジックをベースに日付抽出を追加）
     const results = await page.evaluate(() => {
-        // aタグを基準に取得します
         const links = Array.from(document.querySelectorAll('a[href*="/artworks/"]'));
         const seen = new Set();
         const items = [];
@@ -71,29 +73,35 @@ router.get("/search", async (req, res) => {
             if (seen.has(id)) continue;
             seen.add(id);
 
-            // aタグの親要素を card として定義（ここでエラーが起きていました）
             const card = link.parentElement; 
             const img = link.querySelector("img");
             let rawUrl = img?.src || img?.getAttribute("src") || img?.getAttribute("data-src") || "";
 
             if (!rawUrl || rawUrl.includes('common/images/limit_')) continue;
 
-            // --- 枚数（ページ数）の抽出 ---
-            // Pixivの現在の構造に合わせ、カード内の特定の要素から数字を探します
+            // --- URLから投稿日を抽出 ---
+            let postDate = "";
+            const dateMatch = rawUrl.match(/\/img\/(\d{4}\/\d{2}\/\d{2})\//);
+            if (dateMatch) {
+                postDate = dateMatch[1];
+            }
+
+            // --- 枚数の抽出 ---
             let pageCount = 1;
-            // 画像の上に重なっている枚数表示用のspanや、数字のみの要素を検索
-            const countElements = Array.from(card.querySelectorAll('span, div'));
+            if (card) {
+                const countElements = Array.from(card.querySelectorAll('span, div'));
                 for (const el of countElements) {
                     const txt = el.innerText.trim();
-                    // 非常に小さい範囲にある1〜3桁の純粋な数字を探す
                     if (/^\d{1,3}$/.test(txt) && el.offsetWidth < 40) {
                         pageCount = parseInt(txt);
                         break;
                     }
+                }
             }
 
             if (rawUrl.startsWith('/')) rawUrl = "https://www.pixiv.net" + rawUrl;
 
+            // サムネイルを大きなサイズに置換
             const displayUrl = rawUrl
                 .replace(/\/c\/\d+x\d+[^/]*\//, '/')
                 .replace(/\/(custom-thumb|img-obfuscated)\//, '/img-master/')
@@ -103,8 +111,8 @@ router.get("/search", async (req, res) => {
                 id,
                 url: displayUrl,
                 tags: img?.alt || "",
-                score: 0,
                 pageCount: pageCount,
+                date: postDate, // 追加した日付
                 isPixiv: true
             });
         }

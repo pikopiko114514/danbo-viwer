@@ -19,6 +19,7 @@ const PORT = process.env.PORT || 3000;
 
 // 静的ファイル（index.html, favorites.html, style.css など）を public フォルダから提供
 app.use(express.static(path.join(__dirname, 'public')));
+app.use(express.json());
 
 // APIとプロキシのルートを設定
 app.use("/api", apiRouter);        // Rule34, Gelbooruなど

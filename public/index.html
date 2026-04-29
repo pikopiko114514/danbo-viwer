@@ -5,6 +5,7 @@
     <meta name="referrer" content="no-referrer">
     <title>Booru AI Viewer</title>
     <link rel="stylesheet" href="style.css">
+    <button onclick="location.href='/pixiv'" style="background: #0096fa; color: white;">Pixiv版を開く</button>
 </head>
 <body>
     <div class="header">
@@ -16,10 +17,9 @@
             <button onclick="newSearch()" style="background:#28a745;">この条件で検索</button>
         </div>
         <div class="controls" style="margin-top: 10px; display: flex; gap: 10px; justify-content: center; align-items: center;">
-            <select id="site-select">
+            <select id="site-select" onchange="newSearch()" style="padding: 10px; border-radius: 5px; background: #333; color: white; border: none; cursor: pointer;">
                 <option value="rule34">Rule34</option>
                 <option value="gelbooru">Gelbooru</option>
-                <option value="pixiv">Pixiv (R18/AI)</option>
             </select>
                 <button onclick="window.open('/favorites', '_blank')" style="background: #ff4757; color: white; padding: 10px 20px; border-radius: 5px; border: none; cursor: pointer;">
                     ❤️ 保存済み画像を見る
@@ -51,49 +51,36 @@
         async function search() {
             if (isLoading || !hasMore) return;
             isLoading = true;
+            document.getElementById('status').innerText = "読み込み中...";
 
-            const site = document.getElementById('site-select').value;
-            const query = document.getElementById('search').value;
-            const minScore = parseInt(document.getElementById('min_score').value) || 0;
-
-            // Pixivかそれ以外かでURLを切り替え
-            const endpoint = site === 'pixiv' ? '/api/pixiv/search' : '/api/search';
-            const url = `${endpoint}?q=${encodeURIComponent(query)}&p=${currentPage}${site !== 'pixiv' ? `&site=${site}` : ''}`;
+            const searchInput = document.getElementById('search');
+            const minScoreInput = document.getElementById('min_score');
+            const siteSelect = document.getElementById('site-select');
+            
+            const query = searchInput.value.trim();
+            const minScore = minScoreInput.value || 0;
+            const site = siteSelect ? siteSelect.value : 'rule34';
 
             try {
-                const response = await fetch(url);
+                const response = await fetch(`/api/search?q=${encodeURIComponent(query)}&p=${currentPage}&s=${minScore}&site=${site}`);
                 const data = await response.json();
 
-                if (data.length === 0) {
+                if (!data || data.length === 0) {
                     hasMore = false;
+                    if (currentPage === 0) {
+                        document.getElementById('app').innerHTML = '<p style="text-align:center; width:100%;">これ以上の作品はありません。</p>';
+                    }
                 } else {
-                    // Pixivの場合はフロント側でいいね数フィルタリングをかける
-                    const filtered = site === 'pixiv' 
-                        ? data.filter(item => item.score >= minScore) 
-                        : data;
-                    
-                    renderPosts(filtered);
+                    renderPosts(data);
                     currentPage++;
+                    document.getElementById('status').innerText = "";
                 }
             } catch (e) {
-                console.error("Search failed", e);
+                console.error("Search Error:", e);
+                document.getElementById('status').innerText = "エラーが発生しました。";
             } finally {
                 isLoading = false;
             }
-        }
-        async function openModal(post) {
-            let displayUrl = post.url;
-
-            // PixivならオリジナルURLをオンデマンドで取得
-            if (post.isPixiv) {
-                const res = await fetch(`/api/pixiv/detail/${post.id}`);
-                const detail = await res.json();
-                displayUrl = detail.originalUrl;
-            }
-
-            const modalImg = document.getElementById('modal-img');
-            modalImg.src = `/img?url=${encodeURIComponent(displayUrl)}`;
-            document.getElementById('modal').style.display = 'flex';
         }
         function renderPosts(posts) {
             const app = document.getElementById('app');

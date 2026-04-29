@@ -25,6 +25,9 @@ app.use("/api", apiRouter);        // Rule34, Gelbooruなど
 app.use("/api/pixiv", pixivRouter); // ★Pixiv専用（/api/pixiv/search になる）
 app.use("/img", proxyRouter);
 
+app.get('/pixiv', (req, res) => {
+    res.sendFile(path.join(__dirname, 'public', 'pixiv.html'));
+});
 
 // 「お気に入り画面」のルート
 app.get('/favorites', (req, res) => {

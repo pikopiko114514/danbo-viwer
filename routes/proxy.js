@@ -8,9 +8,13 @@ router.get("/", async (req, res) => {
         const targetUrl = req.query.url;
         if (!targetUrl) return res.status(400).send("No URL provided");
 
-        // URLに gelbooru が含まれているかで判断
-        const isGelbooru = targetUrl.includes("gelbooru.com");
-        const referer = isGelbooru ? "https://gelbooru.com/" : "https://rule34.xxx/";
+        // Pixivのリファラ設定
+        let referer = "https://rule34.xxx/";
+        if (targetUrl.includes("pixiv.net") || targetUrl.includes("pximg.net")) {
+            referer = "https://www.pixiv.net/";
+        } else if (targetUrl.includes("gelbooru.com")) {
+            referer = "https://gelbooru.com/";
+        }
 
         const response = await fetch(targetUrl, {
             headers: {
@@ -19,12 +23,18 @@ router.get("/", async (req, res) => {
             }
         });
 
+        // 失敗した時にコンソールにURLを出してデバッグしやすくする
+        if (!response.ok) {
+            console.log("❌ 失敗したURL:", targetUrl); // これをターミナルで確認
+            return res.status(response.status).send("Fetch failed");
+        }
+
         const arrayBuffer = await response.arrayBuffer();
-        res.set("Content-Type", response.headers.get("content-type"));
+        res.set("Content-Type", response.headers.get("content-type") || "image/jpeg");
         res.send(Buffer.from(arrayBuffer));
     } catch (e) {
+        console.error("Proxy Runtime Error:", e);
         res.status(500).send("Error loading image");
     }
 });
-
 export default router;

@@ -58,9 +58,13 @@
                 } else {
                     url += `&q=${encodeURIComponent(query)}`;
                 }
-                
+                                
                 const response = await fetch(url);
                 const data = await response.json();
+
+                if (!response.ok) {
+                    throw new Error(data.error || "Request failed");
+                }
 
                 if (!data || data.length === 0) {
                     hasMore = false;
@@ -74,7 +78,7 @@
                 }
             } catch (e) {
                 console.error("Pixiv Search failed", e);
-                status.innerText = "エラーが発生しました。";
+                status.innerText = e.message;
             } finally {
                 isLoading = false;
             }
@@ -139,14 +143,7 @@
                 app.appendChild(card);
             });
         }
-
-        // ポップアップ方式のブックマーク
-        function addBookmark(id, btnElement) {
-            const url = `https://www.pixiv.net/bookmark_add.php?type=illust&illust_id=${id}`;
-            window.open(url, 'pixiv_bookmark', 'width=500,height=600,top=100,left=100');
-            btnElement.style.background = "#ff4081";
-        }
-
+        
         // 2. ポップアップ方式のブックマーク関数（確実な方法）
         function addBookmark(id, btnElement) {
             const url = `https://www.pixiv.net/bookmark_add.php?type=illust&illust_id=${id}`;

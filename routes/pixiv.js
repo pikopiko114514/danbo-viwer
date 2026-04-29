@@ -1,15 +1,38 @@
 import express from "express";
 import puppeteer from "puppeteer";
+import rateLimit from "express-rate-limit";
 
 const router = express.Router();
 
-router.get("/search", async (req, res) => {
+const cache = new Map();
+const CACHE_TTL = 10 * 60 * 1000; // 10分
+
+const limiter = rateLimit({
+  windowMs: 60 * 1000, // 1分
+  max: 20,
+  message: {
+    error: "Too many requests. Please try again later."
+  },
+  standardHeaders: true,
+  legacyHeaders: false
+});
+
+router.get("/search", limiter, async (req, res) => {
   const pageNumber = req.query.p || "1";
   const keyword = req.query.q || "AI生成";
   const userId = req.query.userId; // 作者IDを受け取るように追加
   let browser;
+  const encodedKeyword = encodeURIComponent(keyword);
 
   try {
+    const cacheKey = `${keyword}-${pageNumber}-${userId || "tag"}`;
+    const cached = cache.get(cacheKey);
+
+    if (cached && Date.now() - cached.timestamp < CACHE_TTL) {
+        console.log("Cache hit:", cacheKey);
+        return res.json(cached.data);
+    }
+    
     browser = await puppeteer.launch({ headless: "new" });
     const page = await browser.newPage();
 
@@ -31,19 +54,13 @@ router.get("/search", async (req, res) => {
         targetUrl = `https://www.pixiv.net/users/${userId}/artworks?p=${pageNumber}`;
     } else {
         // 通常のタグ検索の場合
-        const encodedKeyword = encodeURIComponent(keyword || "AI生成");
         targetUrl = `https://www.pixiv.net/tags/${encodedKeyword}/artworks?mode=r18&s_mode=s_tag_full&p=${pageNumber}`;
     }
     
     console.log(`Fetching: ${targetUrl}`);
 
     await page.setUserAgent("Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 Chrome/122 Safari/537.36");
-
-    await page.goto(targetUrl, {
-    waitUntil: "domcontentloaded",
-    timeout: 30000
-    });
- 
+     
     await page.setRequestInterception(true);
 
     page.on("request", (req) => {
@@ -54,6 +71,11 @@ router.get("/search", async (req, res) => {
     } else {
         req.continue();
     }
+    });
+
+    await page.goto(targetUrl, {
+    waitUntil: "domcontentloaded",
+    timeout: 30000
     });
 
     await page.waitForSelector('a[href*="/artworks/"]', { timeout: 15000 });
@@ -108,10 +130,11 @@ router.get("/search", async (req, res) => {
 
             // --- 画像URLの整形 ---
             const rawUrl =
-            img.src ||
-            img.getAttribute("src") ||
-            img.getAttribute("data-src") ||
-            "";
+                img.src ||
+                img.getAttribute("src") ||
+                img.getAttribute("data-src") ||
+                img.getAttribute("srcset")?.split(" ")[0] ||
+                "";
 
             const displayUrl = rawUrl
 
@@ -126,6 +149,11 @@ router.get("/search", async (req, res) => {
                 isPixiv: true
             };
         }).filter(Boolean);
+    });
+
+    cache.set(cacheKey, {
+    data: results,
+    timestamp: Date.now()
     });
 
    res.json(results);

@@ -1,145 +1,46 @@
-body {
-    margin: 0;
-    background: #121212;
-    color: white;
-    font-family: sans-serif;
-}
+body { margin: 0; background: #121212; color: white; font-family: sans-serif; }
+.header { position: sticky; top: 0; z-index: 1000; background: #1f1f1f; padding: 15px; text-align: center; border-bottom: 1px solid #333; }
+#app { display: grid; grid-template-columns: repeat(auto-fill, minmax(250px, 1fr)); gap: 15px; padding: 20px; }
 
-/* ヘッダー周り */
-.header {
-    position: sticky;
-    top: 0;
-    z-index: 100;
-    background: #1f1f1f;
-    padding: 15px;
-    text-align: center;
-    border-bottom: 1px solid #333;
-}
-
-input, select {
-    padding: 10px;
-    border-radius: 5px;
-    border: none;
-    margin: 5px;
-    background: #333;
-    color: white;
-}
-
-button {
-    padding: 10px 20px;
-    border-radius: 5px;
-    border: none;
-    color: white;
-    cursor: pointer;
-}
-
-/* メイングリッド */
-#app {
-    display: grid;
-    grid-template-columns: repeat(auto-fill, minmax(250px, 1fr));
-    gap: 15px;
-    padding: 20px;
-}
-
-/* カード全体の調整 */
+/* カードの基本設定 */
 .card {
     position: relative;
     background: #222;
     border-radius: 10px;
-    overflow: hidden;
-    transition: transform 0.2s;
-    height: 350px; /* 高さを統一 */
+    overflow: hidden; /* これが重要：中身がカードの外に出なくなります */
+    height: 380px;
+    display: flex;
+    flex-direction: column;
 }
 
-.card:hover {
-    transform: translateY(-5px);
+/* 画像コンテナ */
+.media-container {
+    position: relative;
+    width: 100%;
+    height: 280px;
+    background: #000;
 }
 
-.card img {
+.media-container img {
     width: 100%;
     height: 100%;
-    object-fit: cover;
-    display: block;
+    object-fit: contain;
 }
 
-/* 情報の重ね合わせ（上部全体） */
-.info-overlay {
-    position: absolute;
-    top: 0;
-    left: 0;
-    right: 0;
-    background: linear-gradient(to bottom, rgba(0,0,0,0.7), transparent);
-    color: white;
-    padding: 8px;
-    display: flex;
-    justify-content: space-between;
-    font-size: 12px;
-    pointer-events: none;
-    z-index: 20;
-}
-
-.score { color: #ffcc00; }
-
-/* ボタンのグループ（右上） */
-.btn-group {
-    position: absolute;
-    top: 10px;
-    right: 10px;
-    display: flex;
-    gap: 5px;
-    z-index: 30;
-}
-
-/* ハート・保存ボタン共通 */
-.like-btn {
-    background: rgba(0, 0, 0, 0.6);
-    color: white;
-    border: 1px solid rgba(255, 255, 255, 0.3);
-    border-radius: 50%;
-    width: 35px;
-    height: 35px;
-    cursor: pointer;
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    font-size: 18px;
-    backdrop-filter: blur(5px);
-}
-
-.like-btn:hover {
-    background: rgba(255, 71, 87, 0.9);
-}
-
-/* タグコンテナ（ホバーで表示） */
+/* タグエリア */
 .tags-container {
-    position: absolute;
-    bottom: 0;
-    left: 0;
-    right: 0;
-    background: rgba(0, 0, 0, 0.85);
-    padding: 10px;
-    max-height: 0;
+    padding: 8px;
+    background: #1a1a1a;
+    flex: 1;
     overflow-y: auto;
-    transition: max-height 0.3s ease-out;
-    display: flex;
-    flex-wrap: wrap;
-    gap: 5px;
-    z-index: 40;
-}
-
-.card:hover .tags-container {
-    max-height: 150px;
 }
 
 .tag {
-    font-size: 11px;
-    background: #444;
-    color: #eee;
-    padding: 2px 6px;
+    display: inline-block;
+    margin: 2px;
+    padding: 3px 6px;
+    background: #333;
     border-radius: 3px;
+    font-size: 10px;
     cursor: pointer;
-}
-
-.tag:hover {
-    background: #007bff;
 }

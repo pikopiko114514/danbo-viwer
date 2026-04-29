@@ -81,7 +81,6 @@
                 isLoading = false;
             }
         }
-
         function renderPosts(posts) {
             const app = document.getElementById('app');
             posts.forEach(post => {
@@ -90,19 +89,35 @@
                 
                 const proxiedUrl = `/img?url=${encodeURIComponent(post.previewUrl || post.url)}`;
                 const postData = encodeURIComponent(JSON.stringify(post));
-                
-                card.innerHTML = `
-                    <div class="info-overlay">
-                        <span class="score">★ ${post.score}</span>
-                        <span class="date">${formatDate(post.createdAt)}</span>
-                    </div>
-                    <img src="${proxiedUrl}" alt="post" loading="lazy">
-                    
-                    <div class="btn-group">
-                        <button class="like-btn" onclick="toggleLike('${postData}')" title="お気に入り">❤️</button>
-                        <button class="like-btn" onclick="downloadImage('${post.url}', '${post.id}')" title="保存">💾</button>
-                    </div>
+                const isLiked = likedPosts.some(p => String(p.id) === String(post.id));
+                const rawDate = post.createdAt || post.created_at;
 
+                card.innerHTML = `
+                    <div class="media-container">
+                        <div style="position: absolute; top: 0; left: 0; padding: 5px 10px; background: rgba(0,0,0,0.6); color: white; font-size: 10px; z-index: 10; pointer-events: none;">
+                            ${formatDate(rawDate)}
+                        </div>
+
+                        <div style="position: absolute; top: 8px; right: 8px; display: flex; gap: 6px; z-index: 20;">
+                            <button id="like-btn-${post.id}" onclick="event.stopPropagation(); toggleLike('${postData}')" 
+                                style="background: rgba(0,0,0,0.7); border: 1px solid rgba(255,255,255,0.3); color: white; width: 36px; height: 36px; border-radius: 50%; cursor: pointer; font-size: 18px; display: flex; align-items: center; justify-content: center;">
+                                ${isLiked ? '❤️' : '🤍'}
+                            </button>
+                            <button onclick="event.stopPropagation(); downloadImage('${post.url}', '${post.id}')" 
+                                style="background: rgba(0,0,0,0.7); border: 1px solid rgba(255,255,255,0.3); color: white; width: 36px; height: 36px; border-radius: 50%; cursor: pointer; font-size: 16px; display: flex; align-items: center; justify-content: center;">
+                                💾
+                            </button>
+                        </div>
+
+                        <a href="${post.url}" target="_blank" style="display: block; width: 100%; height: 100%;">
+                            <img src="${proxiedUrl}" alt="post" loading="lazy">
+                        </a>
+
+                        <div style="position: absolute; bottom: 5px; left: 5px; background: rgba(0,0,0,0.5); color: #ffcc00; padding: 2px 6px; border-radius: 4px; font-size: 11px; pointer-events: none;">
+                            ★ ${post.score}
+                        </div>
+                    </div>
+                    
                     <div class="tags-container">
                         ${post.tags.split(' ').map(tag => `<span class="tag" onclick="jumpToTag('${tag}')">${tag}</span>`).join('')}
                     </div>
@@ -110,21 +125,27 @@
                 app.appendChild(card);
             });
         }
+        function toggleLike(encodedPostData) {
+            const post = JSON.parse(decodeURIComponent(encodedPostData));
+            const btn = document.getElementById(`like-btn-${post.id}`);
+            const index = likedPosts.findIndex(p => String(p.id) === String(post.id));
 
-        function toggleLike(postJson) {
-            const post = JSON.parse(decodeURIComponent(postJson));
-            
-            const currentSite = document.getElementById('site-select').value;
-            post.site = currentSite; 
-
-            const index = likedPosts.findIndex(p => p.id === post.id);
             if (index === -1) {
-                likedPosts.unshift(post);
-                alert("お気に入りに追加しました！");
+                likedPosts.push(post);
+                if (btn) {
+                    btn.innerText = '❤️';
+                    btn.classList.add('liked');
+                    btn.style.transform = "scale(1.3)"; // 少し大きくする演出
+                    setTimeout(() => btn.style.transform = "scale(1)", 200);
+                }
             } else {
                 likedPosts.splice(index, 1);
-                alert("お気に入りから削除しました。");
+                if (btn) {
+                    btn.innerText = '🤍';
+                    btn.classList.remove('liked');
+                }
             }
+
             localStorage.setItem('likedPosts', JSON.stringify(likedPosts));
         }
 

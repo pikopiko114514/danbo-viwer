@@ -4,8 +4,9 @@ import puppeteer from "puppeteer";
 const router = express.Router();
 
 router.get("/search", async (req, res) => {
-  const keyword = req.query.q || "AI生成";
   const pageNumber = req.query.p || "1";
+  const keyword = req.query.q || "AI生成";
+  const userId = req.query.userId; // 作者IDを受け取るように追加
   let browser;
 
   try {
@@ -25,7 +26,16 @@ router.get("/search", async (req, res) => {
     }
 
     const encodedKeyword = encodeURIComponent(keyword);
-    const targetUrl = `https://www.pixiv.net/tags/${encodedKeyword}/artworks?mode=r18&s_mode=s_tag_full&p=${pageNumber}`;
+
+    let targetUrl;
+    if (userId) {
+        // 作者検索の場合
+        targetUrl = `https://www.pixiv.net/users/${userId}/artworks?p=${pageNumber}`;
+    } else {
+        // 通常のタグ検索の場合
+        const encodedKeyword = encodeURIComponent(keyword || "AI生成");
+        targetUrl = `https://www.pixiv.net/tags/${encodedKeyword}/artworks?mode=r18&s_mode=s_tag_full&p=${pageNumber}`;
+    }
     
     console.log(`Fetching: ${targetUrl}`);
 
@@ -59,8 +69,7 @@ router.get("/search", async (req, res) => {
     await new Promise(r => setTimeout(r, 1000));
 
     const results = await page.evaluate(() => {
-        // 1. 画像を包んでいるスパン（ご提示いただいたクラス sc-faf95030-0 など）をすべて取得
-        // クラス名は変わる可能性があるため、[data-gtm-value] という属性名で探すのが最も確実です
+        // 1. 作品の親要素を取得
         const items = Array.from(document.querySelectorAll('[data-gtm-value][data-gtm-user-id]'));
 
         return items.map(item => {
@@ -70,40 +79,56 @@ router.get("/search", async (req, res) => {
             
             if (!img || !id) return null;
 
-            const altText = img.alt || ""; // 例: "#五等分の花嫁 中野家水着集合 - 黒結(くろゆい)のイラスト"
-            const rawUrl = img.src || "";
-
-            // --- 作者名の抽出 (alt属性から「 - 」と「のイラスト」の間を抜く) ---
-            let userName = "不明";
-            if (altText.includes(' - ')) {
-                const parts = altText.split(' - ');
-                if (parts.length > 1) {
-                    // 「黒結(くろゆい)のイラスト」から「のイラスト」を消す
-                    userName = parts[1].replace(/の(イラスト|マンガ|小説)$/, "");
+            // --- 枚数 (pageCount) の抽出 ---
+            // 貼り付けていただいたアイコン（path[d^="M8,3"]）を持つ要素を探す
+            let pageCount = 1;
+            
+            // アイコンが含まれる親要素（通常は枚数表示のバッジ）を探す
+            const svgIcon = item.querySelector('svg path[d^="M8,3"]');
+            if (svgIcon) {
+                // SVGの近くにあるテキスト（数字）を抽出
+                const countText = svgIcon.closest('div').innerText.trim();
+                const count = parseInt(countText);
+                if (!isNaN(count)) {
+                    pageCount = count;
+                }
+            } else {
+                // 予備：SVGが見つからない場合、数字だけの要素を探す
+                const possibleBadges = Array.from(item.querySelectorAll('span, div'));
+                for (const b of possibleBadges) {
+                    if (/^\d+$/.test(b.innerText.trim()) && b.innerText.length < 4) {
+                        pageCount = parseInt(b.innerText);
+                        break;
+                    }
                 }
             }
 
-            // --- 画像URLの整形 (サムネイルからオリジナルに近いマスター版へ) ---
+            // --- 作者名の抽出 ---
+            const altText = img.alt || "";
+            let userName = "不明";
+            if (altText.includes(' - ')) {
+                const parts = altText.split(' - ');
+                userName = parts[parts.length - 1].replace(/の(イラスト|マンガ|小説)$/, "");
+            }
+
+            // --- 画像URLの整形 ---
+            const rawUrl = img.src || "";
             const displayUrl = rawUrl
-                .replace(/\/c\/\d+x\d+[^/]*\//, '/') // サイズ制限を解除
+                .replace(/\/c\/\d+x\d+[^/]*\//, '/')
                 .replace(/\/(custom-thumb|img-obfuscated)\//, '/img-master/')
                 .replace(/_(square1200|master1200|custom1200)\.(jpg|png|jpeg|gif)/, '_master1200.jpg');
-
-            // --- 投稿日の抽出 ---
-            const dMatch = rawUrl.match(/\/img\/(\d{4}\/\d{2}\/\d{2})\//);
-            const postDate = dMatch ? dMatch[1] : "";
 
             return {
                 id: id,
                 url: displayUrl,
                 tags: altText,
-                pageCount: 1, // HTMLからは枚数は不明だが、基本1として処理
-                date: postDate,
+                pageCount: pageCount,
+                date: rawUrl.match(/\/img\/(\d{4}\/\d{2}\/\d{2})\//)?.[1] || "",
                 userName: userName,
                 userId: userId,
                 isPixiv: true
             };
-        }).filter(Boolean); // 無効なデータを排除
+        }).filter(Boolean);
     });
 
     await browser.close();

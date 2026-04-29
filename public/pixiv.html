@@ -30,9 +30,11 @@
         let isLoading = false;
         let hasMore = true;
         let isSearchStarted = false;
+        let currentUserId = null; // 現在の作者検索モードを保持
 
         // 検索リセット
         function newSearch() {
+            currentUserId = null; // キーワード検索時はリセット
             document.getElementById('app').innerHTML = '';
             currentPage = 1;
             hasMore = true;
@@ -49,7 +51,14 @@
             status.innerText = `読み込み中... (${currentPage}ページ目)`;
 
             try {
-                const url = `/api/pixiv/search?q=${encodeURIComponent(query)}&p=${currentPage}`;
+                // userIdがある場合はそちらを優先、ない場合はキーワード検索
+                let url = `/api/pixiv/search?p=${currentPage}`;
+                if (currentUserId) {
+                    url += `&userId=${currentUserId}`;
+                } else {
+                    url += `&q=${encodeURIComponent(query)}`;
+                }
+                
                 const response = await fetch(url);
                 const data = await response.json();
 
@@ -70,6 +79,26 @@
                 isLoading = false;
             }
         }
+        function searchByAuthor(userId, userName) {
+            document.getElementById('app').innerHTML = ''; // 画面クリア
+            currentPage = 1;
+            hasMore = true;
+            isSearchStarted = true;
+            
+            currentUserId = userId; // 作者モードON
+            
+            const status = document.getElementById('status');
+            status.innerHTML = `作者: <strong>${userName}</strong> の作品を表示中 
+                <button onclick="resetToKeywordSearch()" style="margin-left:10px; font-size:12px;">キーワード検索に戻る</button>`;
+            
+            search();
+        }
+
+        // キーワード検索に戻す
+        function resetToKeywordSearch() {
+            currentUserId = null;
+            newSearch();
+        }
         function renderPixivPosts(posts) {
             const app = document.getElementById('app');
             posts.forEach(post => {
@@ -85,10 +114,10 @@
                 // 作者
                 const authorHtml = post.userName 
                 ? `<div class="author-info">
-                    by <a href="https://www.pixiv.net/users/${post.userId}" target="_blank">${post.userName}</a>
+                    by <span class="author-link" onclick="searchByAuthor('${post.userId}', '${post.userName}')" style="color: #0096fa; cursor: pointer; font-weight: bold;">${post.userName}</span>
                 </div>` 
                 : '';
-
+                
                 card.innerHTML = `
                     <div class="media-container" style="position: relative;">
                         <a href="https://www.pixiv.net/artworks/${post.id}" target="_blank" style="display: block;">

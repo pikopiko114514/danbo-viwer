@@ -25,8 +25,6 @@ router.get("/search", async (req, res) => {
         });
     }
 
-    const encodedKeyword = encodeURIComponent(keyword);
-
     let targetUrl;
     if (userId) {
         // 作者検索の場合
@@ -39,34 +37,31 @@ router.get("/search", async (req, res) => {
     
     console.log(`Fetching: ${targetUrl}`);
 
-    // 1. ページ移動
-    await page.goto(targetUrl, { 
-        waitUntil: "networkidle2", 
-        timeout: 60000 
+    await page.setUserAgent("Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 Chrome/122 Safari/537.36");
+
+    await page.goto(targetUrl, {
+    waitUntil: "domcontentloaded",
+    timeout: 30000
+    });
+ 
+    await page.setRequestInterception(true);
+
+    page.on("request", (req) => {
+    const type = req.resourceType();
+
+    if (["image", "media", "font"].includes(type)) {
+        req.abort();
+    } else {
+        req.continue();
+    }
     });
 
     await page.waitForSelector('a[href*="/artworks/"]', { timeout: 15000 });
 
-    await page.evaluate(async () => {
-        await new Promise((resolve) => {
-            let totalHeight = 0;
-            const distance = 1000; // 1回のスクロール量
-            const maxScroll = 8000; // Pixivの1ページ分をカバーする十分な深さ
-            const timer = setInterval(() => {
-                window.scrollBy(0, distance);
-                totalHeight += distance;
-
-                // 十分な深さまでスクロールしたら終了
-                if (totalHeight >= maxScroll) {
-                    clearInterval(timer);
-                    resolve();
-                }
-            }, 200); // 0.2秒おきにスクロール
-        });
-    });
-
-    // 3. スクロール後、画像要素が整うまで1秒だけ待機
-    await new Promise(r => setTimeout(r, 1000));
+    for (let i = 0; i < 3; i++) {
+    await page.evaluate(() => window.scrollBy(0, 2000));
+    await new Promise(r => setTimeout(r, 500));
+    }
 
     const results = await page.evaluate(() => {
         // 1. 作品の親要素を取得
@@ -112,11 +107,13 @@ router.get("/search", async (req, res) => {
             }
 
             // --- 画像URLの整形 ---
-            const rawUrl = img.src || "";
+            const rawUrl =
+            img.src ||
+            img.getAttribute("src") ||
+            img.getAttribute("data-src") ||
+            "";
+
             const displayUrl = rawUrl
-                .replace(/\/c\/\d+x\d+[^/]*\//, '/')
-                .replace(/\/(custom-thumb|img-obfuscated)\//, '/img-master/')
-                .replace(/_(square1200|master1200|custom1200)\.(jpg|png|jpeg|gif)/, '_master1200.jpg');
 
             return {
                 id: id,
@@ -131,13 +128,15 @@ router.get("/search", async (req, res) => {
         }).filter(Boolean);
     });
 
-    await browser.close();
-    res.json(results);
-
+   res.json(results);
   } catch (e) {
-    if (browser) await browser.close();
     console.error("Pixiv Search Error:", e);
-    res.status(500).json({ error: e.message });
+    res.status(500).json({
+    error: "Pixiv fetch failed",
+    detail: e.message
+    });
+  } finally {
+    if (browser) await browser.close();
   }
 });
 
